@@ -4,153 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام المبيعات الزجاجي</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4e54c8">
+    <link rel="apple-touch-icon" href="icon.png">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --glass-bg: rgba(255, 255, 255, 0.15);
-            --glass-border: 1px solid rgba(255, 255, 255, 0.2);
-            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            --primary-color: #4e54c8;
-            --text-color: #fff;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(45deg, #4e54c8, #8f94fb);
-            min-height: 100vh;
-            margin: 0;
-            color: var(--text-color);
-            overflow-x: hidden;
-        }
-
-        /* تنسيق الواجهة الزجاجية */
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: var(--glass-border);
-            border-radius: 15px;
-            box-shadow: var(--glass-shadow);
-            padding: 20px;
-            margin: 10px;
-        }
-
-        /* شريط التنقل */
-        .navbar {
-            display: flex;
-            justify-content: space-around;
-            padding: 15px;
-            margin-bottom: 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .nav-btn {
-            background: rgba(0,0,0,0.2);
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: 0.3s;
-            font-size: 16px;
-        }
-
-        .nav-btn.active, .nav-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: scale(1.05);
-        }
-
-        /* الحقول والأزرار */
-        input, select, button.action-btn {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.1);
-            color: white;
-            outline: none;
-            box-sizing: border-box;
-        }
-
-        input::placeholder { color: rgba(255,255,255,0.7); }
-        
-        option { background: #4e54c8; } /* لإصلاح لون القائمة المنسدلة */
-
-        button.action-btn {
-            background: linear-gradient(90deg, #00c6ff, #0072ff);
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-        }
-
-        button.delete-btn {
-            background: #ff416c;
-            width: auto;
-            padding: 5px 10px;
-        }
-
-        /* الجداول والقوائم */
-        .list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .tab-content { display: none; animation: fadeIn 0.5s; }
-        .tab-content.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* الفاتورة */
-        .invoice-modal {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        
-        .invoice-box {
-            background: white;
-            color: #333;
-            width: 90%;
-            max-width: 400px;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .invoice-actions button {
-            margin: 5px;
-            width: 45%;
-        }
-
-        /* طباعة */
-        @media print {
-            body * { visibility: hidden; }
-            #printableArea, #printableArea * { visibility: visible; color: black; }
-            #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
-            .no-print { display: none; }
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <div id="pwa-install-banner" class="glass-panel" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:2000; margin:0; border-radius:15px 15px 0 0; flex-direction: column; align-items: center; text-align: center;">
+        <p>حمل التطبيق الآن لأداء أفضل وتشغيل بدون إنترنت</p>
+        <div style="display:flex; gap:10px; width:100%">
+            <button class="action-btn" id="installBtn">تثبيت التطبيق</button>
+            <button class="delete-btn" onclick="document.getElementById('pwa-install-banner').style.display='none'">تخطى</button>
+        </div>
+    </div>
 
     <nav class="navbar glass-panel">
         <button class="nav-btn active" onclick="switchTab('products')"><i class="fas fa-box"></i> السلع</button>
         <button class="nav-btn" onclick="switchTab('customers')"><i class="fas fa-users"></i> الزبائن</button>
         <button class="nav-btn" onclick="switchTab('sales')"><i class="fas fa-shopping-cart"></i> بيع</button>
         <button class="nav-btn" onclick="switchTab('records')"><i class="fas fa-file-invoice"></i> السجلات</button>
+        <button class="nav-btn" onclick="switchTab('settings')"><i class="fas fa-cog"></i> الإعدادات</button>
     </nav>
 
     <div class="container" style="max-width: 800px; margin: auto;">
@@ -173,7 +49,7 @@
             <div class="glass-panel">
                 <h3><i class="fas fa-user-plus"></i> إضافة زبون</h3>
                 <input type="text" id="custName" placeholder="اسم الزبون">
-                <input type="text" id="custPhone" placeholder="رقم الواتساب (مع مفتاح الدولة)">
+                <input type="text" id="custPhone" placeholder="رقم الهاتف (مثال: 780...)">
                 <input type="text" id="custAddress" placeholder="العنوان">
                 <button class="action-btn" onclick="addCustomer()">حفظ الزبون</button>
             </div>
@@ -182,26 +58,27 @@
                 <input type="text" id="custSearch" onkeyup="renderCustomers()" placeholder="بحث عن زبون...">
                 <div id="customersList"></div>
             </div>
-
-            <div id="customerDetailsModal" class="glass-panel" style="display:none; margin-top: 20px; border: 2px solid gold;">
-                <h3 id="detailCustName">تفاصيل الزبون</h3>
-                <div id="custHistory"></div>
-                <button class="action-btn" style="background: #ff416c" onclick="document.getElementById('customerDetailsModal').style.display='none'">إغلاق</button>
-            </div>
         </div>
 
         <div id="sales" class="tab-content">
             <div class="glass-panel">
                 <h3><i class="fas fa-cash-register"></i> فاتورة جديدة</h3>
                 
-                <label>اختر الزبون:</label>
-                <select id="saleCustomer"></select>
+                <label>بحث واختيار الزبون:</label>
+                <input type="text" id="saleCustSearch" list="custDataList" placeholder="ابحث عن اسم الزبون..." oninput="selectCustomerFromSearch()">
+                <datalist id="custDataList"></datalist>
+                <input type="hidden" id="selectedCustId">
 
                 <div style="border-top: 1px solid rgba(255,255,255,0.2); margin: 15px 0;"></div>
 
                 <label>إضافة منتجات للسلة:</label>
-                <input type="text" id="saleProdSearch" placeholder="ابحث عن سلعة..." onkeyup="filterSaleProducts()">
-                <select id="saleProduct"></select>
+                <input type="text" id="saleProdSearch" list="prodDataList" placeholder="ابحث عن سلعة (اكتب أول حرف)..." oninput="checkProductStock()">
+                <datalist id="prodDataList"></datalist>
+                
+                <div id="stockDisplay" style="font-size: 0.9em; color: #ffeb3b; margin: 5px 0; display:none;">
+                    المتوفر في المخزون: <span id="currentStockVal">0</span>
+                </div>
+
                 <input type="number" id="saleQty" placeholder="الكمية" value="1">
                 <button class="action-btn" onclick="addToCart()"><i class="fas fa-plus"></i> أضف للسلة</button>
 
@@ -223,9 +100,41 @@
         </div>
 
         <div id="records" class="tab-content">
+            <div id="recordsCustomerList" class="glass-panel">
+                <h3>سجلات الزبائن والديون</h3>
+                <input type="text" id="recordSearch" onkeyup="renderRecordsCustomers()" placeholder="بحث في السجلات...">
+                <div id="recordsListContainer"></div>
+            </div>
+
+            <div id="customerRecordsDetail" class="glass-panel" style="display:none;">
+                <button class="delete-btn" onclick="closeCustomerRecords()" style="margin-bottom:10px;">رجوع للقائمة</button>
+                <div style="background: rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin-bottom:15px;">
+                    <h3 id="recCustName"></h3>
+                    <p>إجمالي الديون المتبقية: <strong id="recTotalDebt" style="color:#ff416c; font-size:1.2em;">0</strong></p>
+                    
+                    <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+                        <input type="number" id="payDebtAmount" placeholder="مبلغ التسديد" style="margin:0;">
+                        <button class="action-btn" onclick="payDebt()" style="width:auto;">تسديد</button>
+                    </div>
+                </div>
+                <h4>سجل الفواتير والدفعات:</h4>
+                <div id="custSpecificInvoices"></div>
+            </div>
+        </div>
+
+        <div id="settings" class="tab-content">
             <div class="glass-panel">
-                <h3>سجل الفواتير</h3>
-                <div id="invoicesList"></div>
+                <h3>إعدادات المتجر</h3>
+                <label>اسم المحل / الشركة:</label>
+                <input type="text" id="shopName" placeholder="أدخل اسم المتجر">
+                
+                <label>رقم هاتف المتجر:</label>
+                <input type="text" id="shopPhone" placeholder="رقم الهاتف">
+                
+                <button class="action-btn" onclick="saveSettings()">حفظ الإعدادات</button>
+                <hr>
+                <h3>النسخ الاحتياطي</h3>
+                <p>يتم مزامنة البيانات تلقائياً مع السحابة (Firebase). للعمل أوفلاين، تأكد من تحميل التطبيق.</p>
             </div>
         </div>
 
@@ -234,7 +143,8 @@
     <div id="invoiceModal" class="invoice-modal">
         <div class="invoice-box">
             <div id="printableArea">
-                <h2>فاتورة مبيعات</h2>
+                <h2 id="printShopName">فاتورة مبيعات</h2>
+                <p id="printShopPhone" style="font-size:0.8em;"></p>
                 <p>التاريخ: <span id="invDate"></span></p>
                 <p>الزبون: <span id="invCust"></span></p>
                 <hr>
@@ -256,310 +166,15 @@
         </div>
     </div>
 
+    <script type="module" src="firebase-config.js"></script>
+    <script src="script.js"></script>
     <script>
-        // --- 1. إدارة البيانات (State Management) ---
-        let products = JSON.parse(localStorage.getItem('products')) || [];
-        let customers = JSON.parse(localStorage.getItem('customers')) || [];
-        let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
-        let currentCart = [];
-        let lastInvoice = null; // لتخزين الفاتورة الحالية للطباعة والواتساب
-
-        function saveData() {
-            localStorage.setItem('products', JSON.stringify(products));
-            localStorage.setItem('customers', JSON.stringify(customers));
-            localStorage.setItem('invoices', JSON.stringify(invoices));
-            renderProducts();
-            renderCustomers();
-            updateSaleDropdowns();
-            renderInvoices();
+        // تسجيل Service Worker للعمل أوفلاين
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+            .then(() => console.log("Service Worker Registered"))
+            .catch(err => console.log("SW Error:", err));
         }
-
-        // --- 2. التنقل بين التبويبات ---
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-            
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active'); // تحديث الزر النشط
-
-            if(tabId === 'sales') updateSaleDropdowns();
-        }
-
-        // --- 3. تبويبة السلع ---
-        function addProduct() {
-            const name = document.getElementById('prodName').value;
-            const price = parseFloat(document.getElementById('prodPrice').value);
-            const qty = parseInt(document.getElementById('prodQty').value);
-
-            if (name && price && qty) {
-                products.push({ id: Date.now(), name, price, qty });
-                saveData();
-                document.getElementById('prodName').value = '';
-                document.getElementById('prodPrice').value = '';
-                document.getElementById('prodQty').value = '';
-                alert('تمت الإضافة بنجاح');
-            } else {
-                alert('يرجى ملء كافة الحقول');
-            }
-        }
-
-        function renderProducts() {
-            const list = document.getElementById('productsList');
-            list.innerHTML = products.map((p, index) => `
-                <div class="list-item">
-                    <span>${p.name} - ${p.price} د.ع (العدد: ${p.qty})</span>
-                    <button class="delete-btn" onclick="deleteProduct(${index})">حذف</button>
-                </div>
-            `).join('');
-        }
-
-        function deleteProduct(index) {
-            if(confirm('هل أنت متأكد من الحذف؟')) {
-                products.splice(index, 1);
-                saveData();
-            }
-        }
-
-        // --- 4. تبويبة الزبائن ---
-        function addCustomer() {
-            const name = document.getElementById('custName').value;
-            const phone = document.getElementById('custPhone').value;
-            const address = document.getElementById('custAddress').value;
-
-            if (name && phone) {
-                customers.push({ id: Date.now(), name, phone, address });
-                saveData();
-                document.getElementById('custName').value = '';
-                document.getElementById('custPhone').value = '';
-                document.getElementById('custAddress').value = '';
-                alert('تمت إضافة الزبون');
-            } else {
-                alert('الاسم ورقم الهاتف ضروريان');
-            }
-        }
-
-        function renderCustomers() {
-            const search = document.getElementById('custSearch').value.toLowerCase();
-            const list = document.getElementById('customersList');
-            
-            const filtered = customers.filter(c => c.name.toLowerCase().includes(search));
-
-            list.innerHTML = filtered.map(c => `
-                <div class="list-item" onclick="showCustomerDetails(${c.id})" style="cursor:pointer">
-                    <span><i class="fas fa-user"></i> ${c.name}</span>
-                    <span style="font-size:0.8em">${c.phone}</span>
-                </div>
-            `).join('');
-        }
-
-        function showCustomerDetails(custId) {
-            const cust = customers.find(c => c.id === custId);
-            const custInvoices = invoices.filter(inv => inv.custId == custId);
-            
-            let totalDebt = 0;
-            let totalPaid = 0;
-
-            let historyHtml = custInvoices.map(inv => {
-                totalDebt += inv.total;
-                totalPaid += inv.paid;
-                return `<div style="border-bottom:1px solid #eee; padding:5px; font-size:0.9em">
-                    تاريخ: ${new Date(inv.date).toLocaleDateString()}<br>
-                    المبلغ: ${inv.total} | واصل: ${inv.paid} | باقي: ${inv.remaining}
-                </div>`;
-            }).join('');
-
-            document.getElementById('detailCustName').innerText = `سجل: ${cust.name}`;
-            document.getElementById('custHistory').innerHTML = `
-                <p>الهاتف: ${cust.phone}</p>
-                <p>العنوان: ${cust.address}</p>
-                <div style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px;">
-                    <strong>إجمالي المشتريات: ${totalDebt}</strong><br>
-                    <strong>إجمالي المدفوع: ${totalPaid}</strong><br>
-                    <strong style="color: #ffcccc">الديون الحالية: ${totalDebt - totalPaid}</strong>
-                </div>
-                <h4>المعاملات السابقة:</h4>
-                ${historyHtml || 'لا توجد معاملات سابقة'}
-            `;
-            document.getElementById('customerDetailsModal').style.display = 'block';
-        }
-
-        // --- 5. تبويبة البيع ---
-        function updateSaleDropdowns() {
-            // تحديث قائمة الزبائن
-            const custSelect = document.getElementById('saleCustomer');
-            custSelect.innerHTML = '<option value="">اختر زبون...</option>' + 
-                customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            
-            // تحديث قائمة السلع (الأولية)
-            filterSaleProducts();
-        }
-
-        function filterSaleProducts() {
-            const search = document.getElementById('saleProdSearch').value.toLowerCase();
-            const prodSelect = document.getElementById('saleProduct');
-            
-            prodSelect.innerHTML = '<option value="">اختر سلعة...</option>' + 
-                products.filter(p => p.name.toLowerCase().includes(search) && p.qty > 0)
-                .map(p => `<option value="${p.id}" data-price="${p.price}" data-name="${p.name}">${p.name} (${p.price})</option>`).join('');
-        }
-
-        function addToCart() {
-            const prodSelect = document.getElementById('saleProduct');
-            const qtyInput = document.getElementById('saleQty');
-            const selectedOption = prodSelect.options[prodSelect.selectedIndex];
-
-            if (!selectedOption || selectedOption.value === "") {
-                alert("يرجى اختيار سلعة");
-                return;
-            }
-
-            const prodId = parseInt(selectedOption.value);
-            const name = selectedOption.getAttribute('data-name');
-            const price = parseFloat(selectedOption.getAttribute('data-price'));
-            const qty = parseInt(qtyInput.value);
-
-            // التحقق من المخزون
-            const productInStock = products.find(p => p.id === prodId);
-            if(qty > productInStock.qty) {
-                alert(`الكمية غير متوفرة! المتاح: ${productInStock.qty}`);
-                return;
-            }
-
-            currentCart.push({ prodId, name, price, qty, total: price * qty });
-            renderCart();
-            qtyInput.value = 1;
-        }
-
-        function renderCart() {
-            const cartDiv = document.getElementById('cartItems');
-            let grandTotal = 0;
-            
-            cartDiv.innerHTML = currentCart.map((item, idx) => {
-                grandTotal += item.total;
-                return `<div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px;">
-                    <span>${item.name} x${item.qty}</span>
-                    <span>${item.total}</span>
-                    <span style="color:red; cursor:pointer" onclick="removeFromCart(${idx})">x</span>
-                </div>`;
-            }).join('');
-
-            document.getElementById('cartTotal').innerText = grandTotal;
-        }
-
-        function removeFromCart(idx) {
-            currentCart.splice(idx, 1);
-            renderCart();
-        }
-
-        function checkout() {
-            const custId = document.getElementById('saleCustomer').value;
-            const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
-            const total = parseFloat(document.getElementById('cartTotal').innerText);
-
-            if (!custId || currentCart.length === 0) {
-                alert("يرجى اختيار زبون وإضافة سلع");
-                return;
-            }
-
-            // تحديث المخزون
-            currentCart.forEach(item => {
-                const product = products.find(p => p.id === item.prodId);
-                if(product) product.qty -= item.qty;
-            });
-
-            const remaining = total - paid;
-            
-            const invoice = {
-                id: Date.now(),
-                date: new Date().toISOString(),
-                custId: parseInt(custId),
-                items: [...currentCart],
-                total: total,
-                paid: paid,
-                remaining: remaining
-            };
-
-            invoices.push(invoice);
-            lastInvoice = invoice; // للحفظ من أجل الطباعة والواتساب
-            
-            saveData();
-            
-            // تصفير الواجهة
-            currentCart = [];
-            renderCart();
-            document.getElementById('amountPaid').value = '';
-            
-            showInvoiceModal(invoice);
-        }
-
-        // --- 6. الفاتورة والطباعة والواتساب ---
-        function showInvoiceModal(invoice) {
-            const customer = customers.find(c => c.id === invoice.custId);
-            
-            document.getElementById('invDate').innerText = new Date(invoice.date).toLocaleString();
-            document.getElementById('invCust').innerText = customer.name;
-            document.getElementById('invItems').innerHTML = invoice.items.map(i => `
-                <tr><td>${i.name}</td><td>${i.qty}</td><td>${i.total}</td></tr>
-            `).join('');
-            
-            document.getElementById('invTotal').innerText = invoice.total;
-            document.getElementById('invPaid').innerText = invoice.paid;
-            document.getElementById('invRem').innerText = invoice.remaining;
-
-            document.getElementById('invoiceModal').style.display = 'flex';
-        }
-
-        function closeInvoice() {
-            document.getElementById('invoiceModal').style.display = 'none';
-        }
-
-        function sendWhatsApp() {
-            if (!lastInvoice) return;
-            const customer = customers.find(c => c.id === lastInvoice.custId);
-            
-            let message = `*فاتورة مبيعات*%0a`;
-            message += `مرحباً ${customer.name}%0a`;
-            message += `التاريخ: ${new Date(lastInvoice.date).toLocaleDateString()}%0a`;
-            message += `------------------%0a`;
-            lastInvoice.items.forEach(item => {
-                message += `${item.name} (عدد ${item.qty}): ${item.total} دينار%0a`;
-            });
-            message += `------------------%0a`;
-            message += `*المجموع الكلي: ${lastInvoice.total}*%0a`;
-            message += `الواصل: ${lastInvoice.paid}%0a`;
-            message += `الباقي: ${lastInvoice.remaining}%0a`;
-            message += `شكراً لتعاملكم معنا!`;
-
-            // تنظيف رقم الهاتف وإضافة المفتاح الدولي إذا لم يكن موجوداً
-            // هنا نفترض أن المستخدم أدخل الرقم كاملاً
-            const url = `https://wa.me/${customer.phone}?text=${message}`;
-            window.open(url, '_blank');
-        }
-
-        // --- 7. تبويبة السجلات ---
-        function renderInvoices() {
-            const list = document.getElementById('invoicesList');
-            // ترتيب من الأحدث للأقدم
-            list.innerHTML = invoices.slice().reverse().map(inv => {
-                const cust = customers.find(c => c.id === inv.custId);
-                return `
-                <div class="list-item">
-                    <div>
-                        <strong>#${inv.id.toString().slice(-4)}</strong> - ${cust ? cust.name : 'زبون محذوف'}<br>
-                        <small>${new Date(inv.date).toLocaleString()}</small>
-                    </div>
-                    <div>
-                        <span style="color:#4caf50">${inv.total}</span>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        // التحميل الأولي
-        renderProducts();
-        renderCustomers();
-        renderInvoices();
-
     </script>
 </body>
 </html>
