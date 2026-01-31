@@ -13,6 +13,25 @@
 </head>
 <body>
 
+    <div id="intro-overlay">
+        <h1>✨ هل صليت على محمد وآل محمد اليوم؟ ✨</h1>
+        <p style="color:white; opacity:0.8">اللهم صلِّ على محمد وآل محمد</p>
+    </div>
+
+    <div id="customAlert" class="custom-alert-box"></div>
+
+    <div id="pinModal" class="pin-modal">
+        <div class="pin-box">
+            <h3>🔐 حماية النظام</h3>
+            <p>أدخل رمز الحماية للحذف (121)</p>
+            <input type="password" id="securityPin" placeholder="الرمز السري" style="text-align:center; letter-spacing:5px; font-size:1.2em">
+            <div style="display:flex; gap:10px;">
+                <button class="action-btn" onclick="verifyPin()">تأكيد</button>
+                <button class="delete-btn" onclick="closePinModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
     <div id="pwa-install-banner" class="glass-panel" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:2000; margin:0; border-radius:15px 15px 0 0; flex-direction: column; align-items: center; text-align: center;">
         <p>حمل التطبيق الآن لأداء أفضل وتشغيل بدون إنترنت</p>
         <div style="display:flex; gap:10px; width:100%">
@@ -124,6 +143,39 @@
 
         <div id="settings" class="tab-content">
             <div class="glass-panel">
+                <h3>📊 الموقف المالي (الإحصائيات)</h3>
+                <div style="margin-bottom: 10px;">
+                    <label>عرض حسب الشهر:</label>
+                    <select id="statsMonthSelect" onchange="calculateFinancialStats()">
+                        <option value="all">كل الأشهر</option>
+                        <option value="1">يناير (1)</option>
+                        <option value="2">فبراير (2)</option>
+                        <option value="3">مارس (3)</option>
+                        <option value="4">أبريل (4)</option>
+                        <option value="5">مايو (5)</option>
+                        <option value="6">يونيو (6)</option>
+                        <option value="7">يوليو (7)</option>
+                        <option value="8">أغسطس (8)</option>
+                        <option value="9">سبتمبر (9)</option>
+                        <option value="10">أكتوبر (10)</option>
+                        <option value="11">نوفمبر (11)</option>
+                        <option value="12">ديسمبر (12)</option>
+                    </select>
+                </div>
+                <div class="finance-dashboard">
+                    <div class="finance-card" style="border-bottom: 3px solid #00b09b;">
+                        <h4>مجموع المحصول (الواصل)</h4>
+                        <div id="totalRevenueDisplay" style="color:#00b09b">0</div>
+                    </div>
+                    <div class="finance-card" style="border-bottom: 3px solid #ff416c;">
+                        <h4>مجموع الديون (الباقي)</h4>
+                        <div id="totalDebtDisplay" style="color:#ff416c">0</div>
+                    </div>
+                </div>
+                <button class="delete-btn" style="width:100%; margin-top:5px; background: #555;" onclick="resetStatsFilter()">🔄 تصفير العدادات (إعادة الحساب)</button>
+            </div>
+
+            <div class="glass-panel">
                 <h3>إعدادات المتجر</h3>
                 <label>اسم المحل / الشركة:</label>
                 <input type="text" id="shopName" placeholder="أدخل اسم المتجر">
@@ -132,9 +184,20 @@
                 <input type="text" id="shopPhone" placeholder="رقم الهاتف">
                 
                 <button class="action-btn" onclick="saveSettings()">حفظ الإعدادات</button>
+                
                 <hr>
-                <h3>النسخ الاحتياطي</h3>
-                <p>يتم مزامنة البيانات تلقائياً مع السحابة (Firebase). للعمل أوفلاين، تأكد من تحميل التطبيق.</p>
+                
+                <h3>💾 النسخ الاحتياطي والاستعادة</h3>
+                <p style="font-size:0.9em; opacity:0.8;">قم بتحميل نسخة من بياناتك أو استعادتها.</p>
+                <button class="action-btn" onclick="backupData()" style="background: linear-gradient(90deg, #f857a6, #ff5858); margin-bottom:10px;">
+                    <i class="fas fa-download"></i> تحميل نسخة احتياطية
+                </button>
+                
+                <label style="display:block; margin-top:10px;">استعادة نسخة:</label>
+                <input type="file" id="restoreFile" accept=".json">
+                <button class="action-btn" onclick="restoreData()" style="background: linear-gradient(90deg, #4b6cb7, #182848);">
+                    <i class="fas fa-upload"></i> رفع واستعادة البيانات
+                </button>
             </div>
         </div>
 
