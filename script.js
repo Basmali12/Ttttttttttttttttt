@@ -6,11 +6,34 @@ let currentCart = [];
 let lastInvoice = null;
 let currentSettings = { name: '', phone: '' };
 
+// المتغيرات الخاصة بعمليات الحذف الآمنة
+let pendingDeleteAction = null; 
+
 // الاستماع لحدث جاهزية قاعدة البيانات
 window.addEventListener('firebaseReady', () => {
     loadData();
     loadSettings();
+    // إخفاء شاشة الترحيب بعد 3 ثواني
+    setTimeout(() => {
+        const overlay = document.getElementById('intro-overlay');
+        if(overlay) overlay.style.display = 'none';
+    }, 3500);
 });
+
+// دالة تنسيق العملة والأرقام (التعديل الأخير: فواصل + عملة د.ع)
+function fmtNum(num) {
+    if(!num && num !== 0) return '0';
+    return Number(num).toLocaleString('en-US') + ' د.ع';
+}
+
+// دالة عرض التنبيهات الجميلة بدلاً من alert
+function showToast(msg, type = 'info') {
+    const box = document.getElementById('customAlert');
+    box.innerHTML = `<i class="fas fa-info-circle"></i> ${msg}`;
+    box.style.display = 'block';
+    box.style.borderColor = type === 'error' ? '#ff416c' : '#00b09b';
+    setTimeout(() => { box.style.display = 'none'; }, 3000);
+}
 
 // --- 1. إدارة البيانات (Firebase + Local) ---
 function loadData() {
@@ -34,6 +57,7 @@ function loadData() {
         invoices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         // الفرز حسب التاريخ
         invoices.sort((a, b) => new Date(b.date) - new Date(a.date));
+        calculateFinancialStats(); // تحديث اللوحة المالية عند تغير البيانات
     });
 }
 
@@ -52,7 +76,9 @@ function switchTab(tabId) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     
     document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    // تحديث اللوحة المالية عند فتح الإعدادات
+    if(tabId === 'settings') calculateFinancialStats();
+    if(event && event.target) event.target.classList.add('active');
 }
 
 // --- 3. تبويبة السلع ---
@@ -68,18 +94,19 @@ async function addProduct() {
         document.getElementById('prodName').value = '';
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodQty').value = '';
-        alert('تمت الإضافة');
+        showToast('تمت إضافة السلعة بنجاح');
     } else {
-        alert('املأ الحقول');
+        showToast('يرجى ملء جميع الحقول', 'error');
     }
 }
 
 function renderProducts() {
     const list = document.getElementById('productsList');
+    // استخدام fmtNum لتنسيق الأسعار
     list.innerHTML = products.map(p => `
         <div class="list-item">
-            <span>${p.name} - ${p.price} (العدد: ${p.qty})</span>
-            <button class="delete-btn" onclick="deleteItem('products', '${p.id}')">حذف</button>
+            <span>${p.name} - ${fmtNum(p.price)} (العدد: ${p.qty})</span>
+            <button class="delete-btn" onclick="requestDelete('products', '${p.id}')">حذف</button>
         </div>
     `).join('');
 }
@@ -97,9 +124,9 @@ async function addCustomer() {
         document.getElementById('custName').value = '';
         document.getElementById('custPhone').value = '';
         document.getElementById('custAddress').value = '';
-        alert('تمت إضافة الزبون');
+        showToast('تمت إضافة الزبون');
     } else {
-        alert('الاسم والهاتف مطلوبان');
+        showToast('الاسم والهاتف مطلوبان', 'error');
     }
 }
 
@@ -110,20 +137,39 @@ function renderCustomers() {
     list.innerHTML = filtered.map(c => `
         <div class="list-item">
             <span>${c.name} (${c.phone})</span>
-            <button class="delete-btn" onclick="deleteItem('customers', '${c.id}')">حذف</button>
+            <button class="delete-btn" onclick="requestDelete('customers', '${c.id}')">حذف</button>
         </div>
     `).join('');
 }
 
-async function deleteItem(col, id) {
-    if(confirm('هل أنت متأكد من الحذف؟')) {
-        await window.deleteDoc(window.doc(window.db, col, id));
+// --- نظام الحماية 121 (التعديل الثاني) ---
+function requestDelete(col, id) {
+    pendingDeleteAction = { col, id };
+    document.getElementById('securityPin').value = '';
+    document.getElementById('pinModal').style.display = 'flex';
+    document.getElementById('securityPin').focus();
+}
+
+function closePinModal() {
+    document.getElementById('pinModal').style.display = 'none';
+    pendingDeleteAction = null;
+}
+
+async function verifyPin() {
+    const pin = document.getElementById('securityPin').value;
+    if (pin === '121') {
+        if (pendingDeleteAction) {
+            await window.deleteDoc(window.doc(window.db, pendingDeleteAction.col, pendingDeleteAction.id));
+            showToast('تم الحذف بنجاح');
+            closePinModal();
+        }
+    } else {
+        showToast('الرمز خطأ! حاول مرة أخرى', 'error');
     }
 }
 
-// --- 5. تبويبة البيع (التعديلات الرئيسية) ---
+// --- 5. تبويبة البيع ---
 
-// تحديث القوائم (Datalist) للفهرسة والبحث
 function updateSaleDatalists() {
     const custDL = document.getElementById('custDataList');
     custDL.innerHTML = customers.map(c => `<option value="${c.name}" data-id="${c.id}"></option>`).join('');
@@ -132,7 +178,6 @@ function updateSaleDatalists() {
     prodDL.innerHTML = products.map(p => `<option value="${p.name}"></option>`).join('');
 }
 
-// اختيار الزبون من البحث
 function selectCustomerFromSearch() {
     const val = document.getElementById('saleCustSearch').value;
     const customer = customers.find(c => c.name === val);
@@ -143,7 +188,6 @@ function selectCustomerFromSearch() {
     }
 }
 
-// التعديل الثاني: فحص المخزون وإظهار الباقي
 function checkProductStock() {
     const val = document.getElementById('saleProdSearch').value;
     const product = products.find(p => p.name === val);
@@ -166,14 +210,13 @@ function addToCart() {
     const product = products.find(p => p.name === prodName);
 
     if (!product) {
-        alert("يرجى اختيار سلعة صحيحة من القائمة");
+        showToast("يرجى اختيار سلعة صحيحة", 'error');
         return;
     }
 
-    // التحقق من الكمية
     if (requestQty > product.qty) {
-        alert(`المخزون لا يكفي! المتاح فقط: ${product.qty} قلل العدد.`);
-        qtyInput.value = product.qty; // تعديل تلقائي للحد الأقصى
+        showToast(`المخزون لا يكفي! المتاح فقط: ${product.qty}`, 'error');
+        qtyInput.value = product.qty;
         return;
     }
 
@@ -188,7 +231,6 @@ function addToCart() {
     });
 
     renderCart();
-    // تفريغ الحقول
     document.getElementById('saleProdSearch').value = '';
     document.getElementById('stockDisplay').style.display = 'none';
     qtyInput.value = 1;
@@ -202,12 +244,12 @@ function renderCart() {
         grandTotal += item.total;
         return `<div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px;">
             <span>${item.name} x${item.qty}</span>
-            <span>${item.total}</span>
+            <span>${fmtNum(item.total)}</span>
             <span style="color:red; cursor:pointer" onclick="removeFromCart(${idx})">x</span>
         </div>`;
     }).join('');
 
-    document.getElementById('cartTotal').innerText = grandTotal;
+    document.getElementById('cartTotal').innerText = fmtNum(grandTotal);
 }
 
 function removeFromCart(idx) {
@@ -218,10 +260,11 @@ function removeFromCart(idx) {
 async function checkout() {
     const custId = document.getElementById('selectedCustId').value;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
-    const total = parseFloat(document.getElementById('cartTotal').innerText);
+    // نحصل على الرقم الخام بدون تنسيق للحسابات
+    const total = currentCart.reduce((sum, item) => sum + item.total, 0);
 
     if (!custId || currentCart.length === 0) {
-        alert("تأكد من اختيار زبون صحيح وإضافة سلع");
+        showToast("تأكد من اختيار زبون صحيح وإضافة سلع", 'error');
         return;
     }
 
@@ -248,7 +291,6 @@ async function checkout() {
 
     const docRef = await window.addDoc(window.collection(window.db, "invoices"), invoice);
     
-    // إضافة المعرف للفاتورة المحلية
     invoice.id = docRef.id;
     lastInvoice = invoice;
 
@@ -260,7 +302,7 @@ async function checkout() {
     showInvoiceModal(invoice);
 }
 
-// --- 6. تبويبة السجلات (التعديل الرابع) ---
+// --- 6. تبويبة السجلات ---
 function renderRecordsCustomers() {
     const search = document.getElementById('recordSearch').value.toLowerCase();
     const container = document.getElementById('recordsListContainer');
@@ -268,18 +310,15 @@ function renderRecordsCustomers() {
     const filteredCusts = customers.filter(c => c.name.toLowerCase().includes(search));
 
     container.innerHTML = filteredCusts.map(c => {
-        // حساب الديون لهذا الزبون
         const custInvoices = invoices.filter(inv => inv.custId === c.id);
         let debt = 0;
         custInvoices.forEach(inv => debt += (inv.remaining || 0));
 
         return `
         <div class="list-item" onclick="openCustomerRecords('${c.id}')" style="cursor:pointer">
-            <div>
-                <strong>${c.name}</strong>
-            </div>
+            <div><strong>${c.name}</strong></div>
             <div style="text-align:left">
-                <span style="color:${debt > 0 ? '#ff416c' : '#4caf50'}">الديون: ${debt}</span>
+                <span style="color:${debt > 0 ? '#ff416c' : '#00b09b'}">الديون: ${fmtNum(debt)}</span>
             </div>
         </div>`;
     }).join('');
@@ -292,16 +331,14 @@ function openCustomerRecords(custId) {
     const customer = customers.find(c => c.id === custId);
     const custInvoices = invoices.filter(inv => inv.custId === custId).sort((a,b) => new Date(b.date) - new Date(a.date));
     
-    // إخفاء القائمة وإظهار التفاصيل
     document.getElementById('recordsCustomerList').style.display = 'none';
     document.getElementById('customerRecordsDetail').style.display = 'block';
 
     document.getElementById('recCustName').innerText = `سجل: ${customer.name}`;
-    
     updateCustomerDebtDisplay(custId);
 
     const invoicesHtml = custInvoices.map(inv => {
-        const isPayment = inv.items.length === 0; // إذا كانت فاتورة تسديد فقط
+        const isPayment = inv.items.length === 0; 
         return `
         <div style="border:1px solid rgba(255,255,255,0.2); padding:10px; margin-bottom:10px; border-radius:5px; background:rgba(0,0,0,0.1)">
             <div style="display:flex; justify-content:space-between">
@@ -310,9 +347,9 @@ function openCustomerRecords(custId) {
             </div>
             ${!isPayment ? `<small>المواد: ${inv.items.map(i=>i.name).join(', ')}</small><br>` : ''}
             <div style="display:flex; justify-content:space-between; margin-top:5px; font-size:0.9em">
-                <span>المبلغ: ${inv.total}</span>
-                <span>واصل: ${inv.paid}</span>
-                <span style="color:${inv.remaining > 0 ? '#ff416c' : '#4caf50'}">باقي: ${inv.remaining}</span>
+                <span>المبلغ: ${fmtNum(inv.total)}</span>
+                <span>واصل: ${fmtNum(inv.paid)}</span>
+                <span style="color:${inv.remaining > 0 ? '#ff416c' : '#4caf50'}">باقي: ${fmtNum(inv.remaining)}</span>
             </div>
             <button class="action-btn" style="padding:5px; font-size:0.8em; margin-top:5px; background:#25D366" onclick="shareInvoiceWhatsApp('${inv.id}')">مشاركة واتساب</button>
         </div>`;
@@ -325,7 +362,7 @@ function updateCustomerDebtDisplay(custId) {
     const custInvoices = invoices.filter(inv => inv.custId === custId);
     let totalDebt = 0;
     custInvoices.forEach(inv => totalDebt += (inv.remaining || 0));
-    document.getElementById('recTotalDebt').innerText = totalDebt;
+    document.getElementById('recTotalDebt').innerText = fmtNum(totalDebt);
 }
 
 function closeCustomerRecords() {
@@ -334,31 +371,26 @@ function closeCustomerRecords() {
     currentRecordCustId = null;
 }
 
-// زر التسديد
 async function payDebt() {
     const amount = parseFloat(document.getElementById('payDebtAmount').value);
     if(!amount || !currentRecordCustId) return;
 
-    // إنشاء سجل "تسديد" (فاتورة فارغة لكن بمدفوعات)
     const paymentRecord = {
         date: new Date().toISOString(),
         custId: currentRecordCustId,
-        items: [], // لا توجد سلع
+        items: [],
         total: 0,
         paid: amount,
-        remaining: -amount // بالسالب يعني تسديد للدين العام
+        remaining: -amount 
     };
 
     await window.addDoc(window.collection(window.db, "invoices"), paymentRecord);
-    
     document.getElementById('payDebtAmount').value = '';
-    // تحديث العرض
     openCustomerRecords(currentRecordCustId);
-    alert("تم تسجيل التسديد");
+    showToast("تم تسجيل التسديد");
 }
 
-
-// --- 7. الفاتورة والطباعة والواتساب ---
+// --- 7. الفاتورة والطباعة ---
 function showInvoiceModal(invoice) {
     const customer = customers.find(c => c.id === invoice.custId);
     
@@ -368,12 +400,12 @@ function showInvoiceModal(invoice) {
     document.getElementById('invDate').innerText = new Date(invoice.date).toLocaleString();
     document.getElementById('invCust').innerText = customer ? customer.name : 'زبون غير موجود';
     document.getElementById('invItems').innerHTML = invoice.items.map(i => `
-        <tr><td>${i.name}</td><td>${i.qty}</td><td>${i.total}</td></tr>
+        <tr><td>${i.name}</td><td>${i.qty}</td><td>${fmtNum(i.total)}</td></tr>
     `).join('');
     
-    document.getElementById('invTotal').innerText = invoice.total;
-    document.getElementById('invPaid').innerText = invoice.paid;
-    document.getElementById('invRem').innerText = invoice.remaining;
+    document.getElementById('invTotal').innerText = fmtNum(invoice.total);
+    document.getElementById('invPaid').innerText = fmtNum(invoice.paid);
+    document.getElementById('invRem').innerText = fmtNum(invoice.remaining);
 
     document.getElementById('invoiceModal').style.display = 'flex';
 }
@@ -382,18 +414,10 @@ function closeInvoice() {
     document.getElementById('invoiceModal').style.display = 'none';
 }
 
-// التعديل الخامس: معالجة رقم الواتساب الذكية
 function formatPhoneNumber(rawNumber) {
-    // إزالة المسافات
     let phone = rawNumber.trim();
-    // إذا بدأ بـ 0، احذفه (مثال 078 -> 78)
-    if (phone.startsWith('0')) {
-        phone = phone.substring(1);
-    }
-    // إذا لم يبدأ بمفتاح الدولة (964)، أضفه
-    if (!phone.startsWith('964')) {
-        phone = '964' + phone;
-    }
+    if (phone.startsWith('0')) phone = phone.substring(1);
+    if (!phone.startsWith('964')) phone = '964' + phone;
     return phone;
 }
 
@@ -421,16 +445,16 @@ function shareInvoiceWhatsAppHelper(invoice) {
     if(invoice.items.length > 0) {
         message += `------------------%0a`;
         invoice.items.forEach(item => {
-            message += `${item.name} (عدد ${item.qty}): ${item.total}%0a`;
+            message += `${item.name} (عدد ${item.qty}): ${fmtNum(item.total)}%0a`;
         });
         message += `------------------%0a`;
     } else {
         message += `*دفعة تسديد حساب*%0a`;
     }
     
-    message += `المطلوب: ${invoice.total}%0a`;
-    message += `الواصل: ${invoice.paid}%0a`;
-    message += `الباقي في هذه القائمة: ${invoice.remaining}%0a`;
+    message += `المطلوب: ${fmtNum(invoice.total)}%0a`;
+    message += `الواصل: ${fmtNum(invoice.paid)}%0a`;
+    message += `الباقي في هذه القائمة: ${fmtNum(invoice.remaining)}%0a`;
     
     if(currentSettings.phone) message += `%0aللاستفسار: ${currentSettings.phone}`;
 
@@ -438,13 +462,106 @@ function shareInvoiceWhatsAppHelper(invoice) {
     window.open(url, '_blank');
 }
 
-// --- 8. الإعدادات ---
+// --- 8. الإعدادات والمالية (التعديل الثالث + الأول) ---
 function saveSettings() {
     const name = document.getElementById('shopName').value;
     const phone = document.getElementById('shopPhone').value;
     currentSettings = { name, phone };
     localStorage.setItem('shopSettings', JSON.stringify(currentSettings));
-    alert('تم حفظ الإعدادات');
+    showToast('تم حفظ الإعدادات');
+}
+
+// دالة حساب المالية
+function calculateFinancialStats() {
+    const monthFilter = document.getElementById('statsMonthSelect').value;
+    let totalRevenue = 0; // المحصول (الواصل)
+    let totalDebt = 0;    // الديون (الباقي)
+
+    invoices.forEach(inv => {
+        const invDate = new Date(inv.date);
+        const invMonth = (invDate.getMonth() + 1).toString(); // شهر 1-12
+        
+        // التحقق من الفلتر: إما الكل أو الشهر المطابق
+        if(monthFilter === 'all' || monthFilter === invMonth) {
+            // الوارد = المبلغ الواصل في الفاتورة
+            totalRevenue += (inv.paid || 0);
+            // الديون = المتبقي في الفاتورة (يمكن أن يكون سالب عند التسديد الزائد وهذا نادر، أو موجب)
+            // في حالة "تسديد دين" (invoice.remaining سالب)، هذا يقلل الدين العام، لذا نجمعه كما هو
+            totalDebt += (inv.remaining || 0);
+        }
+    });
+
+    document.getElementById('totalRevenueDisplay').innerText = fmtNum(totalRevenue);
+    document.getElementById('totalDebtDisplay').innerText = fmtNum(totalDebt);
+}
+
+function resetStatsFilter() {
+    document.getElementById('statsMonthSelect').value = 'all';
+    calculateFinancialStats();
+    showToast('تم إعادة تعيين الفلاتر');
+}
+
+// النسخ الاحتياطي (تحميل)
+function backupData() {
+    const data = {
+        products: products,
+        customers: customers,
+        invoices: invoices,
+        settings: currentSettings
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "backup_" + new Date().toISOString().slice(0,10) + ".json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+}
+
+// استعادة البيانات (رفع)
+async function restoreData() {
+    const fileInput = document.getElementById('restoreFile');
+    const file = fileInput.files[0];
+    if(!file) {
+        showToast('يرجى اختيار ملف JSON أولاً', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if(confirm('سيتم إضافة البيانات فوق البيانات الحالية، هل أنت متأكد؟')) {
+                // استعادة السلع
+                if(data.products) {
+                    for(let p of data.products) {
+                        const { id, ...pData } = p; // إزالة المعرف القديم لإنشاء جديد
+                        await window.addDoc(window.collection(window.db, "products"), pData);
+                    }
+                }
+                // استعادة الزبائن
+                if(data.customers) {
+                    for(let c of data.customers) {
+                        const { id, ...cData } = c;
+                        await window.addDoc(window.collection(window.db, "customers"), cData);
+                    }
+                }
+                // استعادة الفواتير
+                if(data.invoices) {
+                    for(let inv of data.invoices) {
+                        const { id, ...iData } = inv;
+                        await window.addDoc(window.collection(window.db, "invoices"), iData);
+                    }
+                }
+                showToast('تم استعادة البيانات بنجاح! سيتم التحديث...');
+                setTimeout(() => location.reload(), 2000);
+            }
+        } catch(err) {
+            console.error(err);
+            showToast('الملف غير صالح', 'error');
+        }
+    };
+    reader.readAsText(file);
 }
 
 // --- 9. PWA تثبيت التطبيق ---
