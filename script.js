@@ -2,6 +2,8 @@
 let products = [];
 let customers = [];
 let invoices = [];
+let expenses = [];
+let debtors = [];
 let currentCart = [];
 let lastInvoice = null;
 let currentSettings = { name: '', phone: '' };
@@ -20,13 +22,13 @@ window.addEventListener('firebaseReady', () => {
     }, 3500);
 });
 
-// دالة تنسيق العملة والأرقام (التعديل الأخير: فواصل + عملة د.ع)
+// دالة تنسيق العملة والأرقام 
 function fmtNum(num) {
     if(!num && num !== 0) return '0';
     return Number(num).toLocaleString('en-US') + ' د.ع';
 }
 
-// دالة عرض التنبيهات الجميلة بدلاً من alert
+// دالة عرض التنبيهات 
 function showToast(msg, type = 'info') {
     const box = document.getElementById('customAlert');
     box.innerHTML = `<i class="fas fa-info-circle"></i> ${msg}`;
@@ -55,9 +57,22 @@ function loadData() {
     // جلب الفواتير
     window.onSnapshot(window.collection(window.db, "invoices"), (snapshot) => {
         invoices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // الفرز حسب التاريخ
         invoices.sort((a, b) => new Date(b.date) - new Date(a.date));
-        calculateFinancialStats(); // تحديث اللوحة المالية عند تغير البيانات
+        calculateFinancialStats(); 
+        renderExpenses(); // لتحديث رصيد مبيعات اليوم
+    });
+
+    // جلب المصروفات
+    window.onSnapshot(window.collection(window.db, "expenses"), (snapshot) => {
+        expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderExpenses();
+    });
+
+    // جلب المدينين
+    window.onSnapshot(window.collection(window.db, "debtors"), (snapshot) => {
+        debtors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderDebtors();
+        if(currentActiveDebtorId) openDebtor(currentActiveDebtorId);
     });
 }
 
@@ -76,8 +91,8 @@ function switchTab(tabId) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     
     document.getElementById(tabId).classList.add('active');
-    // تحديث اللوحة المالية عند فتح الإعدادات
     if(tabId === 'settings') calculateFinancialStats();
+    if(tabId === 'expenses') renderExpenses();
     if(event && event.target) event.target.classList.add('active');
 }
 
@@ -85,27 +100,31 @@ function switchTab(tabId) {
 async function addProduct() {
     const name = document.getElementById('prodName').value;
     const price = parseFloat(document.getElementById('prodPrice').value);
+    const wholesale = parseFloat(document.getElementById('prodWholesale').value) || price;
     const qty = parseInt(document.getElementById('prodQty').value);
 
     if (name && price && qty) {
         await window.addDoc(window.collection(window.db, "products"), {
-            name, price, qty, createdAt: new Date().toISOString()
+            name, price, wholesale, qty, createdAt: new Date().toISOString()
         });
         document.getElementById('prodName').value = '';
         document.getElementById('prodPrice').value = '';
+        document.getElementById('prodWholesale').value = '';
         document.getElementById('prodQty').value = '';
         showToast('تمت إضافة السلعة بنجاح');
     } else {
-        showToast('يرجى ملء جميع الحقول', 'error');
+        showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
     }
 }
 
 function renderProducts() {
     const list = document.getElementById('productsList');
-    // استخدام fmtNum لتنسيق الأسعار
     list.innerHTML = products.map(p => `
         <div class="list-item">
-            <span>${p.name} - ${fmtNum(p.price)} (العدد: ${p.qty})</span>
+            <div>
+                <strong>${p.name}</strong> (العدد: ${p.qty})<br>
+                <small>مفرد: ${fmtNum(p.price)} | جملة: ${fmtNum(p.wholesale || p.price)}</small>
+            </div>
             <button class="delete-btn" onclick="requestDelete('products', '${p.id}')">حذف</button>
         </div>
     `).join('');
@@ -142,7 +161,7 @@ function renderCustomers() {
     `).join('');
 }
 
-// --- نظام الحماية 121 (التعديل الثاني) ---
+// --- نظام الحماية 121 ---
 function requestDelete(col, id) {
     pendingDeleteAction = { col, id };
     document.getElementById('securityPin').value = '';
@@ -206,6 +225,7 @@ function addToCart() {
     const prodName = document.getElementById('saleProdSearch').value;
     const qtyInput = document.getElementById('saleQty');
     const requestQty = parseInt(qtyInput.value);
+    const priceType = document.getElementById('salePriceType').value;
 
     const product = products.find(p => p.name === prodName);
 
@@ -220,12 +240,13 @@ function addToCart() {
         return;
     }
 
-    const total = product.price * requestQty;
+    const unitPrice = priceType === 'wholesale' ? (product.wholesale || product.price) : product.price;
+    const total = unitPrice * requestQty;
     
     currentCart.push({ 
         prodId: product.id, 
         name: product.name, 
-        price: product.price, 
+        price: unitPrice, 
         qty: requestQty, 
         total: total 
     });
@@ -260,7 +281,6 @@ function removeFromCart(idx) {
 async function checkout() {
     const custId = document.getElementById('selectedCustId').value;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
-    // نحصل على الرقم الخام بدون تنسيق للحسابات
     const total = currentCart.reduce((sum, item) => sum + item.total, 0);
 
     if (!custId || currentCart.length === 0) {
@@ -462,7 +482,7 @@ function shareInvoiceWhatsAppHelper(invoice) {
     window.open(url, '_blank');
 }
 
-// --- 8. الإعدادات والمالية (التعديل الثالث + الأول) ---
+// --- 8. الإعدادات والمالية ---
 function saveSettings() {
     const name = document.getElementById('shopName').value;
     const phone = document.getElementById('shopPhone').value;
@@ -471,22 +491,17 @@ function saveSettings() {
     showToast('تم حفظ الإعدادات');
 }
 
-// دالة حساب المالية
 function calculateFinancialStats() {
     const monthFilter = document.getElementById('statsMonthSelect').value;
-    let totalRevenue = 0; // المحصول (الواصل)
-    let totalDebt = 0;    // الديون (الباقي)
+    let totalRevenue = 0; 
+    let totalDebt = 0;    
 
     invoices.forEach(inv => {
         const invDate = new Date(inv.date);
-        const invMonth = (invDate.getMonth() + 1).toString(); // شهر 1-12
+        const invMonth = (invDate.getMonth() + 1).toString();
         
-        // التحقق من الفلتر: إما الكل أو الشهر المطابق
         if(monthFilter === 'all' || monthFilter === invMonth) {
-            // الوارد = المبلغ الواصل في الفاتورة
             totalRevenue += (inv.paid || 0);
-            // الديون = المتبقي في الفاتورة (يمكن أن يكون سالب عند التسديد الزائد وهذا نادر، أو موجب)
-            // في حالة "تسديد دين" (invoice.remaining سالب)، هذا يقلل الدين العام، لذا نجمعه كما هو
             totalDebt += (inv.remaining || 0);
         }
     });
@@ -501,12 +516,14 @@ function resetStatsFilter() {
     showToast('تم إعادة تعيين الفلاتر');
 }
 
-// النسخ الاحتياطي (تحميل)
+// النسخ الاحتياطي
 function backupData() {
     const data = {
         products: products,
         customers: customers,
         invoices: invoices,
+        expenses: expenses,
+        debtors: debtors,
         settings: currentSettings
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
@@ -518,7 +535,7 @@ function backupData() {
     downloadAnchorNode.remove();
 }
 
-// استعادة البيانات (رفع)
+// استعادة البيانات
 async function restoreData() {
     const fileInput = document.getElementById('restoreFile');
     const file = fileInput.files[0];
@@ -532,27 +549,12 @@ async function restoreData() {
         try {
             const data = JSON.parse(e.target.result);
             if(confirm('سيتم إضافة البيانات فوق البيانات الحالية، هل أنت متأكد؟')) {
-                // استعادة السلع
-                if(data.products) {
-                    for(let p of data.products) {
-                        const { id, ...pData } = p; // إزالة المعرف القديم لإنشاء جديد
-                        await window.addDoc(window.collection(window.db, "products"), pData);
-                    }
-                }
-                // استعادة الزبائن
-                if(data.customers) {
-                    for(let c of data.customers) {
-                        const { id, ...cData } = c;
-                        await window.addDoc(window.collection(window.db, "customers"), cData);
-                    }
-                }
-                // استعادة الفواتير
-                if(data.invoices) {
-                    for(let inv of data.invoices) {
-                        const { id, ...iData } = inv;
-                        await window.addDoc(window.collection(window.db, "invoices"), iData);
-                    }
-                }
+                if(data.products) for(let p of data.products) { const { id, ...pData } = p; await window.addDoc(window.collection(window.db, "products"), pData); }
+                if(data.customers) for(let c of data.customers) { const { id, ...cData } = c; await window.addDoc(window.collection(window.db, "customers"), cData); }
+                if(data.invoices) for(let inv of data.invoices) { const { id, ...iData } = inv; await window.addDoc(window.collection(window.db, "invoices"), iData); }
+                if(data.expenses) for(let exp of data.expenses) { const { id, ...eData } = exp; await window.addDoc(window.collection(window.db, "expenses"), eData); }
+                if(data.debtors) for(let d of data.debtors) { const { id, ...dData } = d; await window.addDoc(window.collection(window.db, "debtors"), dData); }
+                
                 showToast('تم استعادة البيانات بنجاح! سيتم التحديث...');
                 setTimeout(() => location.reload(), 2000);
             }
@@ -564,7 +566,160 @@ async function restoreData() {
     reader.readAsText(file);
 }
 
-// --- 9. PWA تثبيت التطبيق ---
+// --- 9. نظام المصروفات (صرفيات اليوم) ---
+async function addExpense() {
+    const amount = parseFloat(document.getElementById('expAmount').value);
+    const notes = document.getElementById('expNotes').value || 'بدون ملاحظات';
+    
+    if (amount) {
+        await window.addDoc(window.collection(window.db, "expenses"), {
+            amount, notes, date: new Date().toISOString()
+        });
+        document.getElementById('expAmount').value = '';
+        document.getElementById('expNotes').value = '';
+        showToast('تم إضافة المصروف');
+    } else {
+        showToast('يرجى إدخال المبلغ', 'error');
+    }
+}
+
+function renderExpenses() {
+    let todaySales = 0;
+    let todayExpenses = 0;
+    const todayStr = new Date().toDateString();
+
+    invoices.forEach(inv => {
+        if(new Date(inv.date).toDateString() === todayStr) {
+            todaySales += (inv.paid || 0);
+        }
+    });
+
+    const list = document.getElementById('expensesList');
+    list.innerHTML = expenses.map(e => {
+        const expDateStr = new Date(e.date).toDateString();
+        if(expDateStr === todayStr) {
+            todayExpenses += (e.amount || 0);
+        }
+        
+        // عرض فقط مصروفات اليوم
+        if(expDateStr === todayStr) {
+            return `
+            <div class="list-item">
+                <div>
+                    <strong style="color:#ff416c;">${fmtNum(e.amount)}</strong><br>
+                    <small>${e.notes}</small><br>
+                    <small style="color:rgba(255,255,255,0.6)">${new Date(e.date).toLocaleTimeString()}</small>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <button class="action-btn" style="padding:5px; width:auto; background:#f0ad4e;" onclick="editExpense('${e.id}')">تعديل</button>
+                    <button class="delete-btn" onclick="requestDelete('expenses', '${e.id}')">حذف</button>
+                </div>
+            </div>`;
+        }
+        return '';
+    }).join('');
+
+    const netBalance = todaySales - todayExpenses;
+    document.getElementById('todaySalesBalance').innerText = fmtNum(netBalance);
+}
+
+async function editExpense(id) {
+    const exp = expenses.find(e => e.id === id);
+    if(!exp) return;
+    
+    const newAmount = prompt("أدخل المبلغ الجديد:", exp.amount);
+    if(newAmount === null) return; 
+    
+    const newNotes = prompt("أدخل الملاحظات الجديدة:", exp.notes);
+    
+    if(!isNaN(newAmount) && newAmount !== "") {
+        await window.updateDoc(window.doc(window.db, "expenses", id), {
+            amount: parseFloat(newAmount),
+            notes: newNotes !== null ? newNotes : exp.notes
+        });
+        showToast('تم تعديل المصروف');
+    }
+}
+
+// --- 10. نظام المدين المستقل ---
+let currentActiveDebtorId = null;
+
+async function addDebtor() {
+    const amount = parseFloat(document.getElementById('debtorAmount').value);
+    const notes = document.getElementById('debtorNotes').value;
+    
+    if (amount && notes) {
+        await window.addDoc(window.collection(window.db, "debtors"), {
+            balance: amount,
+            notes: notes,
+            createdAt: new Date().toISOString(),
+            transactions: []
+        });
+        document.getElementById('debtorAmount').value = '';
+        document.getElementById('debtorNotes').value = '';
+        showToast('تم إضافة المدين');
+    } else {
+        showToast('الرجاء إدخال المبلغ والملاحظات', 'error');
+    }
+}
+
+function renderDebtors() {
+    const list = document.getElementById('debtorsList');
+    list.innerHTML = debtors.map(d => `
+        <div class="list-item" onclick="openDebtor('${d.id}')" style="cursor:pointer">
+            <span>${d.notes}</span>
+            <span style="color:#ff416c; font-weight:bold;">${fmtNum(d.balance)}</span>
+        </div>
+    `).join('');
+}
+
+function openDebtor(id) {
+    currentActiveDebtorId = id;
+    const debtor = debtors.find(d => d.id === id);
+    if(!debtor) return;
+
+    document.getElementById('debtorsMain').style.display = 'none';
+    document.getElementById('debtorDetail').style.display = 'block';
+
+    document.getElementById('detDebtorNotes').innerText = debtor.notes;
+    document.getElementById('detDebtorBalance').innerText = fmtNum(debtor.balance);
+
+    const transHtml = (debtor.transactions || []).map(t => `
+        <div style="border-bottom:1px solid rgba(255,255,255,0.1); padding:10px 0; display:flex; justify-content:space-between;">
+            <span style="color:#00b09b;">تسديد: ${fmtNum(t.amount)}</span>
+            <small style="color:#aaa">${new Date(t.date).toLocaleString()}</small>
+        </div>
+    `).join('');
+    
+    document.getElementById('debtorTransactions').innerHTML = transHtml || '<p>لا توجد معاملات.</p>';
+}
+
+function closeDebtor() {
+    document.getElementById('debtorDetail').style.display = 'none';
+    document.getElementById('debtorsMain').style.display = 'block';
+    currentActiveDebtorId = null;
+}
+
+async function payDebtor() {
+    const amount = parseFloat(document.getElementById('debtorPayAmount').value);
+    if(!amount || !currentActiveDebtorId) return;
+
+    const debtor = debtors.find(d => d.id === currentActiveDebtorId);
+    const newBalance = debtor.balance - amount;
+    
+    const newTrans = { amount: amount, date: new Date().toISOString() };
+    const updatedTransactions = [...(debtor.transactions || []), newTrans];
+
+    await window.updateDoc(window.doc(window.db, "debtors", currentActiveDebtorId), {
+        balance: newBalance,
+        transactions: updatedTransactions
+    });
+
+    document.getElementById('debtorPayAmount').value = '';
+    showToast('تم تسجيل التسديد');
+}
+
+// --- 11. PWA تثبيت التطبيق ---
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
