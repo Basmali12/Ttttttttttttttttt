@@ -45,6 +45,8 @@
         <button class="nav-btn" onclick="switchTab('customers')"><i class="fas fa-users"></i> الزبائن</button>
         <button class="nav-btn" onclick="switchTab('sales')"><i class="fas fa-shopping-cart"></i> بيع</button>
         <button class="nav-btn" onclick="switchTab('records')"><i class="fas fa-file-invoice"></i> السجلات</button>
+        <button class="nav-btn" onclick="switchTab('expenses')"><i class="fas fa-money-bill-wave"></i> صرفيات اليوم</button>
+        <button class="nav-btn" onclick="switchTab('debtors')"><i class="fas fa-hand-holding-usd"></i> المدين</button>
         <button class="nav-btn" onclick="switchTab('settings')"><i class="fas fa-cog"></i> الإعدادات</button>
     </nav>
 
@@ -54,7 +56,8 @@
             <div class="glass-panel">
                 <h3><i class="fas fa-plus-circle"></i> إضافة سلعة</h3>
                 <input type="text" id="prodName" placeholder="اسم السلعة">
-                <input type="number" id="prodPrice" placeholder="سعر السلعة">
+                <input type="number" id="prodPrice" placeholder="سعر المفرد">
+                <input type="number" id="prodWholesale" placeholder="سعر الجملة">
                 <input type="number" id="prodQty" placeholder="الكمية">
                 <button class="action-btn" onclick="addProduct()">حفظ السلعة</button>
             </div>
@@ -83,6 +86,12 @@
             <div class="glass-panel">
                 <h3><i class="fas fa-cash-register"></i> فاتورة جديدة</h3>
                 
+                <label>نوع السعر:</label>
+                <select id="salePriceType" style="margin-bottom: 10px;">
+                    <option value="retail">سعر المفرد</option>
+                    <option value="wholesale">سعر الجملة</option>
+                </select>
+
                 <label>بحث واختيار الزبون:</label>
                 <input type="text" id="saleCustSearch" list="custDataList" placeholder="ابحث عن اسم الزبون..." oninput="selectCustomerFromSearch()">
                 <datalist id="custDataList"></datalist>
@@ -138,6 +147,49 @@
                 </div>
                 <h4>سجل الفواتير والدفعات:</h4>
                 <div id="custSpecificInvoices"></div>
+            </div>
+        </div>
+
+        <div id="expenses" class="tab-content">
+            <div class="glass-panel">
+                <h3 style="text-align:center; margin:0;">رصيد مبيعات اليوم</h3>
+                <h2 style="text-align:center; color:#00b09b; margin-top:5px;" id="todaySalesBalance">0</h2>
+            </div>
+            <div class="glass-panel">
+                <h3><i class="fas fa-money-bill-wave"></i> إنشاء مصروف</h3>
+                <input type="number" id="expAmount" placeholder="المبلغ">
+                <input type="text" id="expNotes" placeholder="الملاحظات (اختياري)">
+                <button class="action-btn" onclick="addExpense()">حفظ المصروف</button>
+            </div>
+            <div class="glass-panel">
+                <h3>سجل صرفيات اليوم</h3>
+                <div id="expensesList"></div>
+            </div>
+        </div>
+
+        <div id="debtors" class="tab-content">
+            <div id="debtorsMain" class="glass-panel">
+                <h3><i class="fas fa-user-tag"></i> إنشاء مدين</h3>
+                <input type="number" id="debtorAmount" placeholder="المبلغ الكلي / الرصيد">
+                <input type="text" id="debtorNotes" placeholder="الملاحظات (اسم المدين أو التفاصيل)">
+                <button class="action-btn" onclick="addDebtor()">حفظ المدين</button>
+                <hr>
+                <h3>قائمة المدينين</h3>
+                <div id="debtorsList"></div>
+            </div>
+            <div id="debtorDetail" class="glass-panel" style="display:none;">
+                <button class="delete-btn" onclick="closeDebtor()" style="margin-bottom:10px;">رجوع للقائمة</button>
+                <div style="background: rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin-bottom:15px;">
+                    <h3 id="detDebtorNotes"></h3>
+                    <p>الرصيد الكلي: <strong id="detDebtorBalance" style="color:#ff416c; font-size:1.2em;">0</strong></p>
+                    
+                    <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+                        <input type="number" id="debtorPayAmount" placeholder="أضف المبلغ للتسديد" style="margin:0;">
+                        <button class="action-btn" onclick="payDebtor()" style="width:auto;"><i class="fas fa-plus"></i> تسديد</button>
+                    </div>
+                </div>
+                <h4>سجل المعاملات:</h4>
+                <div id="debtorTransactions"></div>
             </div>
         </div>
 
